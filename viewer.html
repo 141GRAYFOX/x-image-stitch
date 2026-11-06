@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>切图合一 · X 图片预览</title>
+  <link rel="stylesheet" href="viewer.css">
+  <script src="core.js" defer></script>
+  <script src="viewer.js" defer></script>
+</head>
+<body>
+  <header>
+    <div class="brand"><span class="logo" aria-hidden="true">▦</span><div><h1>切图合一</h1><p>把分散的画面，接回完整的一张。</p></div></div>
+    <div class="actions"><button id="retry" hidden>重新加载</button><button id="save" class="primary" disabled>保存 PNG ↗</button></div>
+  </header>
+  <main>
+    <aside>
+      <p class="eyebrow">COMPOSE / 拼接</p>
+      <h2>完整画面，轻松看。</h2>
+      <label for="layout">图片布局</label>
+      <select id="layout" disabled><option value="horizontal">横向无缝拼接（默认）</option><option value="vertical">竖向长图</option><option value="grid">两列网格</option></select>
+      <div class="section-title"><label>图片顺序</label><button id="reset" class="text" disabled>还原</button></div>
+      <div id="tiles" aria-label="点击两张缩略图交换位置"></div>
+      <p class="hint">按上传顺序从左到右无缝拼接。点击两张缩略图即可交换位置。</p>
+      <div class="divider"></div>
+      <div class="section-title"><label>旋转整图 · <span id="rotation-angle" role="status" aria-live="polite">0°</span></label><button id="rotation-reset" class="text" disabled>还原方向</button></div>
+      <div class="zoom-actions"><button id="rotate-left" title="向左旋转 90°" disabled>↶ 左转 90°</button><button id="rotate-right" title="向右旋转 90°" disabled>↷ 右转 90°</button></div>
+      <div class="divider"></div>
+      <label for="zoom">浏览缩放</label>
+      <div class="zoom-actions"><button id="fit" disabled>适应窗口</button><button id="actual" disabled>原始大小</button></div>
+      <input id="zoom" type="range" min="10" max="200" value="100" aria-label="缩放百分比" disabled>
+      <p id="dimensions" class="hint">正在准备图片…</p>
+      <p class="privacy">图片只在本机拼接<br>无需账号、密钥或额外服务</p>
+    </aside>
+    <section id="stage" aria-label="合成图片预览" tabindex="0">
+      <div id="status" role="status" aria-live="polite">正在读取切图…</div>
+      <canvas id="canvas" hidden aria-label="拼接后的完整图片"></canvas>
+    </section>
+  </main>
+  <footer><span id="quality">优先读取可获取的原尺寸图片</span><span>无间距拼接 · PNG 导出</span></footer>
+</body>
+</html>
