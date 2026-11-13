@@ -1,6 +1,7 @@
 /* Shared validation and pixel geometry. No site scripts or external libraries. */
 (() => {
   "use strict";
+  const MAX_IMAGES = 20;
   function mediaURL(input, size = "orig") {
     const url = new URL(input);
     if (url.protocol !== "https:" || url.hostname !== "pbs.twimg.com" || url.port ||
@@ -16,13 +17,13 @@
     return url.href;
   }
   function validateImages(urls) {
-    if (!Array.isArray(urls) || urls.length < 2 || urls.length > 4) throw new Error("需要同一条推文中的 2～4 张图片");
+    if (!Array.isArray(urls) || urls.length < 2 || urls.length > MAX_IMAGES) throw new Error(`需要同一条推文中的 2～${MAX_IMAGES} 张图片`);
     const normalized = urls.map(url => mediaURL(url));
     if (new Set(normalized).size !== normalized.length) throw new Error("图片重复，无法确定切图顺序");
     return normalized;
   }
   function geometry(images, columns) {
-    if (images.length < 2 || images.length > 4 || ![1, 2, images.length].includes(columns)) throw new Error("无效布局");
+    if (images.length < 2 || images.length > MAX_IMAGES || ![1, 2, images.length].includes(columns)) throw new Error("无效布局");
     const rows = Math.ceil(images.length / columns);
     const widths = Array(columns).fill(0);
     const heights = Array(rows).fill(0);
@@ -42,5 +43,5 @@
       width: img.width, height: img.height
     }))};
   }
-  globalThis.StitchCore = Object.freeze({mediaURL, validateImages, geometry});
+  globalThis.StitchCore = Object.freeze({MAX_IMAGES, mediaURL, validateImages, geometry});
 })();

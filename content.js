@@ -1,8 +1,10 @@
 (() => {
   "use strict";
   const mounted = new WeakMap();
-  const selector = 'article[data-testid="tweet"]';
+  const selector = "article";
+  const statusPath = /^\/(?:[\w]+|i\/web)\/status\/(\d+)\/?$/;
   let closePreview = null;
+  let checkedDetail;
 
   function openPreview(url, trigger) {
     closePreview?.();
@@ -68,23 +70,43 @@
 
   function collect(article) {
     // A quote belongs to a different status ID even when it shares the outer article.
-    const status = article.querySelector("time")?.closest("a[href]")?.href;
-    const id = status?.match(/\/status\/(\d+)/)?.[1];
+    const status = [...article.querySelectorAll('a[href*="/status/"]')].filter(link =>
+      link.closest(selector) === article && statusPath.test(link.pathname));
+    // The newer X layout puts its timestamp link after the quoted post.
+    const own = status.find(link => link.querySelector("time") && !link.closest('[data-testid="quoteTweet"]')) || status.at(-1);
+    const id = own?.pathname.match(statusPath)?.[1];
     if (!id) return null;
     const photos = new Map();
     for (const a of article.querySelectorAll('a[href*="/photo/"]')) {
-      const match = a.href.match(/\/status\/(\d+)\/photo\/([1-4])(?:[/?#]|$)/);
+      const match = a.href.match(/\/status\/(\d+)\/photo\/(\d+)(?:[/?#]|$)/);
       if (!match || match[1] !== id || a.closest(selector) !== article) continue;
       const index = Number(match[2]);
+      if (index < 1 || index > StitchCore.MAX_IMAGES) continue;
       if (!photos.has(index)) photos.set(index, null);
-      const img = a.querySelector('img[src*="pbs.twimg.com/media/"]');
+      const media = 'img[src*="pbs.twimg.com/media/"]';
+      // In the gallery, the link sits over its tile as a sibling of the image.
+      const img = a.querySelector(media) || (a.parentElement.querySelectorAll('a[href*="/photo/"]').length === 1
+        ? a.parentElement.querySelector(media) : null);
       if (!img) continue;
       try { photos.set(index, StitchCore.mediaURL(img.currentSrc || img.src)); }
       catch { /* Ignore avatars, videos and unsupported media. */ }
     }
-    if (photos.size < 2 || photos.size > 4) return null;
+    if (checkedDetail?.id === id && checkedDetail.urls?.length >= 2 && checkedDetail.urls.length >= photos.size) {
+      return {id, urls: checkedDetail.urls};
+    }
     try { return {id, urls: StitchCore.validateImages(Array.from({length: photos.size}, (_, i) => photos.get(i + 1)))}; }
-    catch { return null; }
+    catch {
+      const detailId = location.pathname.match(/\/status\/(\d+)(?:\/|$)/)?.[1];
+      if (id === detailId && checkedDetail?.id !== id && (photos.size || article.querySelector('img[src*="pbs.twimg.com/media/"]'))) {
+        const check = checkedDetail = {id};
+        check.pending = Promise.resolve().then(() => chrome.runtime.sendMessage({type: "x-stitch:check", id})).then(response => {
+          if (checkedDetail !== check || !response?.ok || !Array.isArray(response.urls) || response.urls.length < 2) return;
+          check.urls = response.urls;
+          if (article.isConnected) update(article);
+        }).catch(() => {});
+      }
+      return null;
+    }
   }
 
   function update(article) {
@@ -121,7 +143,11 @@
       button.disabled = true;
       error.hidden = true;
       try {
-        const latest = collect(article);
+        let latest = collect(article);
+        if (!latest && checkedDetail?.pending) {
+          await checkedDetail.pending;
+          latest = collect(article);
+        }
         if (!latest) throw new Error("推文内容已变化，请刷新后重试");
         const response = await chrome.runtime.sendMessage({type: "x-stitch:open", ...latest});
         if (!response?.ok) throw new Error(response?.error || "无法打开预览");
