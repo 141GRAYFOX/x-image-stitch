@@ -16,10 +16,25 @@
       }
     }, true);
   }
-  let images = [], order = [], selected = null, fitting = true, payload, rotation = 0;
+  let images = [], order = [], selected = null, fitting = true, payload, rotation = 0, baseQuality = "";
   const controls = ["save", "layout", "reset", "fit", "actual", "zoom", "rotate-left", "rotate-right", "rotation-reset"];
-  function columns() {
-    return $("layout").value === "horizontal" ? images.length : $("layout").value === "vertical" ? 1 : 2;
+  function layout() {
+    const value = $("layout").value;
+    if (value === "uniform-height") return {columns: images.length, uniform: true};
+    return {columns: value === "horizontal" ? images.length : value === "vertical" ? 1 : 2, uniform: false};
+  }
+  function columns() { return layout().columns; }
+  function updateQuality(sorted, config, result) {
+    const parts = [baseQuality];
+    if (config.uniform) {
+      parts.push(`等高横拼 · 统一到 ${result.height.toLocaleString()} px 高度，部分图片已等比放大`);
+    } else if (new Set(sorted.map(img => `${img.width}x${img.height}`)).size !== 1) {
+      parts.push("切图尺寸不同，按原尺寸对齐，空白处透明");
+    }
+    if (result.width * result.height > StitchCore.WARN_PIXELS) {
+      parts.push("大图导出可能占用较多内存与时间");
+    }
+    $("quality").textContent = parts.filter(Boolean).join(" · ");
   }
 
   async function loadImage(url) {
@@ -79,15 +94,29 @@
   function render() {
     try {
       const sorted = order.map(i => images[i]);
-      const result = StitchCore.geometry(sorted, columns());
-      canvas.width = rotation % 2 ? result.height : result.width;
-      canvas.height = rotation % 2 ? result.width : result.height;
+      const config = layout();
+      const result = StitchCore.geometry(sorted, config.columns, config.uniform);
+      const wantWidth = rotation % 2 ? result.height : result.width;
+      const wantHeight = rotation % 2 ? result.width : result.height;
+      canvas.width = wantWidth;
+      canvas.height = wantHeight;
+      if (canvas.width !== wantWidth || canvas.height !== wantHeight) {
+        throw new Error("浏览器无法创建该尺寸的画布，请切换布局或减少图片数量");
+      }
+      // Only the equal-height mode resamples pixels; the original layouts stay pixel-exact.
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = config.uniform ? "high" : "low";
       // Integer quarter-turn matrices preserve pixels without an extra full-size canvas.
       if (rotation === 1) ctx.setTransform(0, 1, -1, 0, result.height, 0);
       else if (rotation === 2) ctx.setTransform(-1, 0, 0, -1, result.width, result.height);
       else if (rotation === 3) ctx.setTransform(0, -1, 1, 0, 0, result.width);
-      sorted.forEach((img, i) => ctx.drawImage(img.bitmap, result.cells[i].x, result.cells[i].y));
+      sorted.forEach((img, i) => {
+        const cell = result.cells[i];
+        if (config.uniform) ctx.drawImage(img.bitmap, cell.x, cell.y, cell.width, cell.height);
+        else ctx.drawImage(img.bitmap, cell.x, cell.y);
+      });
       ctx.resetTransform();
+      updateQuality(sorted, config, result);
       $("rotation-angle").textContent = `${rotation * 90}°`;
       $("rotation-reset").disabled = rotation === 0;
       canvas.hidden = false;
@@ -117,10 +146,11 @@
   $("retry").addEventListener("click", () => location.reload());
   $("save").addEventListener("click", () => {
     $("save").disabled = true;
-    const filename = `x-${payload.id}-stitched-${columns()}col${rotation ? `-${rotation * 90}deg` : ""}.png`;
+    const mode = layout().uniform ? "uniform" : `${columns()}col`;
+    const filename = `x-${payload.id}-stitched-${mode}${rotation ? `-${rotation * 90}deg` : ""}.png`;
     canvas.toBlob(blob => {
       $("save").disabled = false;
-      if (!blob) { $("quality").textContent = "导出失败，请切换布局后重试"; return; }
+      if (!blob) { $("quality").textContent = "导出失败（多为内存不足）：请切换两列/竖向布局、关闭其他标签页后重试"; return; }
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -148,10 +178,7 @@
       order = images.map((_, i) => i);
       controls.forEach(id => $(id).disabled = false);
       const fallback = images.some(img => img.size !== "orig");
-      $("quality").textContent = fallback ? "部分原图不可用，已使用 large 尺寸图片" : "已读取原尺寸图片 · 在本机完成拼接";
-      if (new Set(images.map(img => `${img.width}x${img.height}`)).size !== 1) {
-        $("quality").textContent += " · 切图尺寸不同，按原尺寸对齐，空白处透明";
-      }
+      baseQuality = fallback ? "部分原图不可用，已使用 large 尺寸图片" : "已读取原尺寸图片 · 在本机完成拼接";
       thumbnails(); render();
     } catch (error) {
       $("status").textContent = error.message || "无法读取图片信息，请从推文重新打开。";

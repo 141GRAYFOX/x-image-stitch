@@ -18,10 +18,10 @@
       <p class="eyebrow">COMPOSE / 拼接</p>
       <h2>完整画面，轻松看。</h2>
       <label for="layout">图片布局</label>
-      <select id="layout" disabled><option value="horizontal">横向无缝拼接（默认）</option><option value="vertical">竖向长图</option><option value="grid">两列网格</option></select>
+      <select id="layout" disabled><option value="horizontal">横向无缝拼接（默认）</option><option value="uniform-height">等高横拼（统一到最高）</option><option value="vertical">竖向长图</option><option value="grid">两列网格</option></select>
       <div class="section-title"><label>图片顺序</label><button id="reset" class="text" disabled>还原</button></div>
       <div id="tiles" aria-label="点击两张缩略图交换位置"></div>
-      <p class="hint">按上传顺序从左到右无缝拼接。点击两张缩略图即可交换位置。</p>
+      <p class="hint">按上传顺序从左到右无缝拼接。点击两张缩略图即可交换位置。「等高横拼」会把所有图片等比统一到最高的那张的高度，边缘平齐无留白。</p>
       <div class="divider"></div>
       <div class="section-title"><label>旋转整图 · <span id="rotation-angle" role="status" aria-live="polite">0°</span></label><button id="rotation-reset" class="text" disabled>还原方向</button></div>
       <div class="zoom-actions"><button id="rotate-left" title="向左旋转 90°" disabled>↶ 左转 90°</button><button id="rotate-right" title="向右旋转 90°" disabled>↷ 右转 90°</button></div>
